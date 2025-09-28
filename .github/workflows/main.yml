@@ -1,43 +1,32 @@
-name: Deploy ngocminhwood to VPS
+name: Deploy to VPS
 
 on:
   push:
     branches:
-      - main
+      - main   # chỉ deploy khi push vào main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout code (chỉ để tham chiếu, code thực tế lấy từ VPS git pull)
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Deploy qua SSH
+      - name: Setup SSH
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > id_ed25519
+          chmod 600 id_ed25519
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            # Tạo folder project nếu chưa có
-            mkdir -p /var/www/ngocminhwood.com
+        run: |
+          ssh -i id_ed25519 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /var/www/ngocminhwood.com
-
-            # Clone lần đầu hoặc pull về
-            if [ ! -d ".git" ]; then
-              git clone git@github-ngocminhwood:jakediep1902/ngocminhwood.git .
-            else
-              git reset --hard
-              git pull origin main
-            fi
-
-            # Phân quyền cho Nginx
-            chown -R www-data:www-data /var/www/ngocminhwood.com
-            chmod -R 755 /var/www/ngocminhwood.com
-
-            # Reload nginx
-            sudo systemctl reload nginx || true
+            git reset --hard
+            git pull origin main
+            # Nếu dùng npm/yarn build thì chạy thêm:
+            # npm install && npm run build
+            systemctl restart nginx || true
+          EOF
