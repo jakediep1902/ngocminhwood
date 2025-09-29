@@ -1,42 +1,22 @@
-name: Deploy NgocMinhWood Website
+name: Test SSH Connection
 
 on:
-  push:
-    branches:
-      - main   # Mỗi lần bạn push code lên nhánh main thì auto deploy
+  workflow_dispatch: # chạy thủ công từ tab Actions
 
 jobs:
-  deploy:
+  ssh-test:
     runs-on: ubuntu-latest
-
     steps:
-      # Bước 1: Lấy code từ repo
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      # Bước 2: SSH vào VPS và deploy
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            # Vào thư mục web
-            cd /var/www/ngocminhwood.com || exit
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-            # Nếu chưa clone repo thì clone
-            if [ ! -d ".git" ]; then
-              git clone git@github-ngocminhwood:jakediep1902/ngocminhwood.git .
-            else
-              git reset --hard
-              git pull origin main
-            fi
-
-            # Phân quyền cho web server
-            chown -R www-data:www-data /var/www/ngocminhwood.com
-            chmod -R 755 /var/www/ngocminhwood.com
-
-            # Restart/reload nginx
-            systemctl reload nginx || true
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "hostname && whoami && uptime"
