@@ -1,43 +1,34 @@
-name: Deploy ngocminhwood to VPS
+name: Auto Deploy to VPS
 
 on:
   push:
     branches:
-      - main
+      - main   # deploy khi push vào nhánh main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout code (chỉ để tham chiếu, code thực tế lấy từ VPS git pull)
-      - name: Checkout code
+      - name: Checkout source
         uses: actions/checkout@v3
 
-      # Deploy qua SSH
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            # Tạo folder project nếu chưa có
-            mkdir -p /var/www/ngocminhwood.com
-            cd /var/www/ngocminhwood.com
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-            # Clone lần đầu hoặc pull về
-            if [ ! -d ".git" ]; then
-              git clone git@github-ngocminhwood:jakediep1902/ngocminhwood.git .
-            else
-              git reset --hard
-              git pull origin main
-            fi
+      - name: Deploy HTML files to VPS
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.VPS_PORT }}" \
+            ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/ngocminhwood.com/html
 
-            # Phân quyền cho Nginx
-            chown -R www-data:www-data /var/www/ngocminhwood.com
-            chmod -R 755 /var/www/ngocminhwood.com
-
-            # Reload nginx
-            sudo systemctl reload nginx || true
+      - name: Reload Nginx
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            sudo nginx -t
+            sudo systemctl reload nginx
+          EOF
