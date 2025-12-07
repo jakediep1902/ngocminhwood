@@ -443,6 +443,7 @@
                 <li><a href="#about">About</a></li>
                 <li><a href="#why">Why Us</a></li>
                 <li><a href="#gallery">Gallery</a></li>
+                <li><a href="#videos">Videos</a></li>
                 <li><a href="#contact">Contact</a></li>
             </ul>
         </div>
@@ -478,6 +479,13 @@
             <h2>Product Gallery</h2>
             <p>Explore NgocMinhWood's collection of premium veneer sheets</p>
             <div class="gallery-grid" id="galleryGrid"></div>
+        </section>
+
+        <!-- Videos Section -->
+        <section id="videos">
+            <h2>Product Videos</h2>
+            <p>Watch our premium veneer sheets in action</p>
+            <div class="gallery-grid" id="videosGrid"></div>
         </section>
 
         <!-- Contact Section -->
@@ -598,19 +606,26 @@
                 if (!found) break;
             }
 
-            // Detect videos (1.mp4 onwards)
+            // Detect videos (supports .mp4, .webm, .ogg)
             for (let i = 1; i <= 100; i++) {
-                const url = `videos/${i}.mp4`;
-                try {
-                    const res = await fetch(url, { method: 'HEAD' });
-                    if (res.ok) {
-                        videos.push(url);
-                    } else {
-                        break;
+                const extensions = ['mp4', 'webm', 'ogg'];
+                let found = false;
+                
+                for (const ext of extensions) {
+                    const url = `videos/${i}.${ext}`;
+                    try {
+                        const res = await fetch(url, { method: 'HEAD' });
+                        if (res.ok) {
+                            videos.push(url);
+                            found = true;
+                            break;
+                        }
+                    } catch (e) {
+                        // continue to next extension
                     }
-                } catch (e) {
-                    break;
                 }
+                
+                if (!found) break;
             }
 
             return [...images, ...videos];
@@ -658,9 +673,13 @@
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async () => {
             const files = await detectFiles();
-            renderGallery('aboutGallery', files.slice(0, 4));
-            renderGallery('whyGallery', files.slice(4, 12));
-            renderGallery('galleryGrid', files);
+            const images = files.filter(f => f.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+            const videos = files.filter(f => f.match(/\.(mp4|webm|ogg)$/i));
+            
+            renderGallery('aboutGallery', images.slice(0, 4));
+            renderGallery('whyGallery', images.slice(4, 12));
+            renderGallery('galleryGrid', images);
+            renderGallery('videosGrid', videos);
         });
     </script>
 
